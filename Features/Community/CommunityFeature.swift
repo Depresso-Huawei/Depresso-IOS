@@ -11,18 +11,18 @@ struct CommunityFeature {
         var posts: [CommunityPost] = []
         var isLoading: Bool = true
         var errorMessage: String?
+        var likedPostIDs: Set<UUID> = []
         @Presents var destination: Destination.State?
     }
 
     enum Action {
         case task
         case postsLoaded(Result<[CommunityPost], Error>)
+        case likedIDsLoaded(Set<UUID>)
         case addPostButtonTapped
         case destination(PresentationAction<Destination.Action>)
         case postSavedSuccessfully(CommunityPost)
         case saveFailed(Error)
-
-        // ✅ ADDED: Action for liking a post
         case likeButtonTapped(id: CommunityPost.ID)
     }
 
@@ -32,6 +32,7 @@ struct CommunityFeature {
     }
 
     @Dependency(\.modelContext) var modelContext
+    @Dependency(\.userDefaultsClient) var userDefaultsClient
 
     @MainActor // Ensures reducer runs on the main actor
     var body: some Reducer<State, Action> {
@@ -40,17 +41,22 @@ struct CommunityFeature {
             case .task:
                 state.isLoading = true
                 state.errorMessage = nil
-                return .run { send in
-                    // Fetch initial posts
-                    let descriptor = FetchDescriptor<CommunityPost>(sortBy: [SortDescriptor(\.creationDate, order: .reverse)])
-                    do {
-                        // Access context directly because reducer is MainActor isolated
-                        let posts = try modelContext.context.fetch(descriptor)
-                        await send(.postsLoaded(.success(posts)))
-                    } catch {
-                        await send(.postsLoaded(.failure(error)))
+                return .merge(
+                    .run { send in
+                        // Fetch initial posts
+                        let descriptor = FetchDescriptor<CommunityPost>(sortBy: [SortDescriptor(\.creationDate, order: .reverse)])
+                        do {
+                            // Access context directly because reducer is MainActor isolated
+                            let posts = try modelContext.context.fetch(descriptor)
+                            await send(.postsLoaded(.success(posts)))
+                        } catch {
+                            await send(.postsLoaded(.failure(error)))
+                        }
+                    },
+                    .run { send in
+                        await send(.likedIDsLoaded(await userDefaultsClient.loadLikedPostIDs()))
                     }
-                }
+                )
 
             case .postsLoaded(.success(let posts)):
                 state.posts = posts
@@ -61,6 +67,10 @@ struct CommunityFeature {
                 state.isLoading = false
                 state.errorMessage = "Failed to load community stories."
                 print("Error loading community posts: \(error)")
+                return .none
+
+            case .likedIDsLoaded(let ids):
+                state.likedPostIDs = ids
                 return .none
 
             case .addPostButtonTapped:
@@ -94,30 +104,27 @@ struct CommunityFeature {
                 // Optionally show an alert here
                 return .none
 
-            // ✅ ADDED: Handle the like button tap
             case .likeButtonTapped(let id):
-                // Find the index of the post in the state array
                 guard let index = state.posts.firstIndex(where: { $0.id == id }) else {
-                    print("Error: Post with ID \(id) not found in state.")
                     return .none
                 }
 
-                // Increment the like count directly on the object in the array
-                // Since CommunityPost is a class (@Model), this modifies the original object
-                state.posts[index].likeCount += 1
-
-                // Save the changes to SwiftData
-                // No need for .run or explicit MainActor here, as reducer is already isolated
-                do {
-                    // Access context directly
-                    try modelContext.context.save()
-                    print("✅ Post liked and saved.")
-                } catch {
-                    print("❌ Failed to save like: \(error)")
-                    // Optionally revert the like count or show an error
-                    state.posts[index].likeCount -= 1 // Revert optimistic update
+                let post = state.posts[index]
+                if state.likedPostIDs.contains(id) {
+                    state.likedPostIDs.remove(id)
+                    post.likeCount -= 1
+                } else {
+                    state.likedPostIDs.insert(id)
+                    post.likeCount += 1
                 }
-                return .none // State update happens directly
+
+                // Save the ModelContext
+                try? modelContext.context.save()
+
+                let likedIDs = state.likedPostIDs
+                return .run { _ in
+                    await userDefaultsClient.saveLikedPostIDs(likedIDs)
+                }
 
             case .destination(.dismiss):
                  state.destination = nil

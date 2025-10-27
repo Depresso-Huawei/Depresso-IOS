@@ -14,6 +14,8 @@ struct DashboardView: View {
                     healthMetricsSection
                     dailyAssessmentSection
                     weeklyStepsSection
+                    weeklyEnergySection
+                    weeklyHeartRateSection
                     WellnessTasksView( // Assumes this view is defined correctly elsewhere
                         store: store.scope(state: \.wellnessTasksState, action: \.wellnessTasks)
                     )
@@ -77,6 +79,31 @@ struct DashboardView: View {
               }
           }
       }
+    @ViewBuilder private var weeklyEnergySection: some View {
+        VStack(alignment: .leading) {
+            Text("Weekly Active Energy").font(.ds.headline)
+            if store.isLoading {
+                RoundedRectangle(cornerRadius: 8).fill(Color(UIColor.systemGray6)).frame(height: 150).overlay(ProgressView())
+            } else if store.weeklyEnergy.isEmpty {
+                Text("No energy data available.").font(.ds.caption).foregroundStyle(.secondary).padding().frame(maxWidth: .infinity, alignment: .center)
+            } else {
+                EnergyChartView(energyData: store.weeklyEnergy).frame(height: 150)
+            }
+        }
+    }
+
+    @ViewBuilder private var weeklyHeartRateSection: some View {
+        VStack(alignment: .leading) {
+            Text("Weekly Heart Rate").font(.ds.headline)
+            if store.isLoading {
+                RoundedRectangle(cornerRadius: 8).fill(Color(UIColor.systemGray6)).frame(height: 150).overlay(ProgressView())
+            } else if store.weeklyHeartRate.isEmpty {
+                Text("No heart rate data available.").font(.ds.caption).foregroundStyle(.secondary).padding().frame(maxWidth: .infinity, alignment: .center)
+            } else {
+                HeartRateChartView(heartRateData: store.weeklyHeartRate).frame(height: 150)
+            }
+        }
+    }
 }
 
 // MARK: - Chart Views
@@ -88,6 +115,39 @@ struct StepsChartView: View {
          .chartYAxis { AxisMarks(position: .leading) }
      }
  }
+
+struct EnergyChartView: View {
+    let energyData: [EnergyData]
+    var body: some View {
+        Chart(energyData) { data in
+            LineMark(
+                x: .value("Day", data.date, unit: .day),
+                y: .value("Energy", data.value)
+            )
+            .foregroundStyle(Color.green.gradient)
+            .interpolationMethod(.catmullRom)
+        }
+        .chartXAxis { AxisMarks(values: .stride(by: .day)) { _ in AxisValueLabel(format: .dateTime.weekday(.narrow), centered: true) } }
+        .chartYAxis { AxisMarks(position: .leading) }
+    }
+}
+
+struct HeartRateChartView: View {
+    let heartRateData: [HeartRateData]
+    var body: some View {
+        Chart(heartRateData) { data in
+            LineMark(
+                x: .value("Day", data.date, unit: .day),
+                y: .value("Heart Rate", data.value)
+            )
+            .foregroundStyle(Color.pink.gradient)
+            .interpolationMethod(.catmullRom)
+        }
+        .chartXAxis { AxisMarks(values: .stride(by: .day)) { _ in AxisValueLabel(format: .dateTime.weekday(.narrow), centered: true) } }
+        .chartYAxis { AxisMarks(position: .leading) }
+    }
+}
+
 struct AssessmentChartView: View {
      let history: [DailyAssessment] // Defined in Core/Data
      private var yDomain: ClosedRange<Int> {
@@ -125,6 +185,8 @@ struct AssessmentChartView: View {
     let initialState = DashboardFeature.State(
         healthMetrics: HealthMetric.mock, // Assumes defined in HealthMetric.swift
         weeklySteps: StepData.mock, // Assumes defined in HealthClient.swift
+        weeklyEnergy: EnergyData.mock,
+        weeklyHeartRate: HeartRateData.mock,
         isLoading: false,
         wellnessTasksState: .init(), // Provide default state
         assessmentHistory: Array(sampleHistory)

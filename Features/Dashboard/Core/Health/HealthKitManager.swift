@@ -72,6 +72,44 @@ class HealthKitManager {
         return weeklyData.sorted { $0.date < $1.date }
     }
 
+    func fetchWeeklyActiveEnergy() async -> [EnergyData] {
+        print("Fetching weekly active energy...")
+        var weeklyData: [EnergyData] = []
+        let calendar = Calendar.current
+        let today = calendar.startOfDay(for: Date())
+
+        for i in 0..<7 {
+            guard let date = calendar.date(byAdding: .day, value: -i, to: today) else { continue }
+            let dayStart = calendar.startOfDay(for: date)
+            let dayEnd = calendar.date(byAdding: .day, value: 1, to: dayStart)!
+
+            let energy = await fetchQuantityData(for: .activeEnergyBurned, from: dayStart, to: dayEnd, options: .cumulativeSum) ?? 0.0
+            weeklyData.append(EnergyData(date: dayStart, value: energy))
+        }
+
+        print("Finished fetching weekly active energy. Count: \(weeklyData.count)")
+        return weeklyData.sorted { $0.date < $1.date }
+    }
+
+    func fetchWeeklyHeartRate() async -> [HeartRateData] {
+        print("Fetching weekly heart rate...")
+        var weeklyData: [HeartRateData] = []
+        let calendar = Calendar.current
+        let today = calendar.startOfDay(for: Date())
+
+        for i in 0..<7 {
+            guard let date = calendar.date(byAdding: .day, value: -i, to: today) else { continue }
+            let dayStart = calendar.startOfDay(for: date)
+            let dayEnd = calendar.date(byAdding: .day, value: 1, to: dayStart)!
+
+            let heartRate = await fetchQuantityData(for: .heartRate, from: dayStart, to: dayEnd, options: .discreteAverage) ?? 0.0
+            weeklyData.append(HeartRateData(date: dayStart, value: heartRate))
+        }
+
+        print("Finished fetching weekly heart rate. Count: \(weeklyData.count)")
+        return weeklyData.sorted { $0.date < $1.date }
+    }
+
     // --- Helper Functions ---
      private func fetchQuantityData(for typeIdentifier: HKQuantityTypeIdentifier, from start: Date, to end: Date, options: HKStatisticsOptions = .cumulativeSum) async -> Double? {
         guard let quantityType = HKQuantityType.quantityType(forIdentifier: typeIdentifier) else {

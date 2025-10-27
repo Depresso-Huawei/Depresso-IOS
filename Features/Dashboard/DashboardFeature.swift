@@ -12,6 +12,8 @@ struct DashboardFeature {
         static func == (lhs: DashboardFeature.State, rhs: DashboardFeature.State) -> Bool {
             return lhs.healthMetrics == rhs.healthMetrics &&
                    lhs.weeklySteps == rhs.weeklySteps &&
+                   lhs.weeklyEnergy == rhs.weeklyEnergy &&
+                   lhs.weeklyHeartRate == rhs.weeklyHeartRate &&
                    lhs.isLoading == rhs.isLoading &&
                    lhs.wellnessTasksState == rhs.wellnessTasksState &&
                    lhs.assessmentHistory.map(\.id) == rhs.assessmentHistory.map(\.id) &&
@@ -21,6 +23,8 @@ struct DashboardFeature {
 
         var healthMetrics: [HealthMetric] = []
         var weeklySteps: [StepData] = [] // StepData is now defined in HealthClient.swift
+        var weeklyEnergy: [EnergyData] = []
+        var weeklyHeartRate: [HeartRateData] = []
         var isLoading: Bool = true
         var wellnessTasksState = WellnessTasksFeature.State() // Assumes defined
         var assessmentHistory: [DailyAssessment] = [] // Assumes defined
@@ -30,7 +34,7 @@ struct DashboardFeature {
 
      enum Action {
          case task
-         case healthDataLoaded(Result<([HealthMetric], [StepData]), Error>) // Type matches
+         case healthDataLoaded(Result<([HealthMetric], [StepData], [EnergyData], [HeartRateData]), Error>)
          case wellnessTasks(WellnessTasksFeature.Action)
          case assessmentHistoryLoaded(Result<[DailyAssessment], Error>)
          case takeAssessmentButtonTapped
@@ -61,7 +65,7 @@ struct DashboardFeature {
                           try? await healthClient.requestAuthorization()
                           // Then fetch data
                           await send(.healthDataLoaded(Result {
-                              try await (healthClient.fetchHealthMetrics(), healthClient.fetchWeeklySteps())
+                              try await (healthClient.fetchHealthMetrics(), healthClient.fetchWeeklySteps(), healthClient.fetchWeeklyActiveEnergy(), healthClient.fetchWeeklyHeartRate())
                           }))
                       },
                       .run { send in
@@ -74,9 +78,11 @@ struct DashboardFeature {
                        .send(.checkForAssessmentStatus)
                   )
 
-             case .healthDataLoaded(.success(let (metrics, steps))):
+             case .healthDataLoaded(.success(let (metrics, steps, energy, heartRate))):
                  state.healthMetrics = metrics
                  state.weeklySteps = steps
+                 state.weeklyEnergy = energy
+                 state.weeklyHeartRate = heartRate
                  state.isLoading = false
                  return .none
 

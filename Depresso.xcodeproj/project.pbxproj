@@ -52,6 +52,7 @@
 		C1BF95602E9032D4006839CF /* WellnessTasksFeature.swift in Sources */ = {isa = PBXBuildFile; fileRef = C1BF955F2E9032D3006839CF /* WellnessTasksFeature.swift */; };
 		C1BF95642E905D78006839CF /* DataSubmissionClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = C1BF95632E905D77006839CF /* DataSubmissionClient.swift */; };
 		C1BF95652E9067A5006839CF /* AIClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = C13258DE2E9011CA008DB386 /* AIClient.swift */; };
+		C1D2FDDC2EAF64B0000C95B4 /* AppFeature.swift in Sources */ = {isa = PBXBuildFile; fileRef = C1D2FDD92EAF64B0000C95B4 /* AppFeature.swift */; };
 		C1DAE5352E908621008F0BE1 /* GoogleService-Info.plist in Resources */ = {isa = PBXBuildFile; fileRef = C1DAE5342E908621008F0BE1 /* GoogleService-Info.plist */; };
 		C1F3E28A2E906C10001A5E02 /* FirebaseAI in Frameworks */ = {isa = PBXBuildFile; productRef = C1F3E2892E906C10001A5E02 /* FirebaseAI */; };
 /* End PBXBuildFile section */
@@ -98,6 +99,7 @@
 		C1BF955D2E9032AB006839CF /* DataClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DataClient.swift; sourceTree = "<group>"; };
 		C1BF955F2E9032D3006839CF /* WellnessTasksFeature.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WellnessTasksFeature.swift; sourceTree = "<group>"; };
 		C1BF95632E905D77006839CF /* DataSubmissionClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DataSubmissionClient.swift; sourceTree = "<group>"; };
+		C1D2FDD92EAF64B0000C95B4 /* AppFeature.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppFeature.swift; sourceTree = "<group>"; };
 		C1DAE5342E908621008F0BE1 /* GoogleService-Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = "GoogleService-Info.plist"; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
@@ -150,6 +152,7 @@
 		C13258B52E8FEF67008DB386 /* App */ = {
 			isa = PBXGroup;
 			children = (
+				C1D2FDD92EAF64B0000C95B4 /* AppFeature.swift */,
 				C13258AA2E8FEDB5008DB386 /* ContentView.swift */,
 				C13258A82E8FEDB4008DB386 /* DepressoApp.swift */,
 			);
@@ -427,6 +430,7 @@
 				C1BF95602E9032D4006839CF /* WellnessTasksFeature.swift in Sources */,
 				C18FB07C2EABADD90049ADE8 /* DailyAssessment.swift in Sources */,
 				C142820E2E99E5E600371EB4 /* PHQ8.swift in Sources */,
+				C1D2FDDC2EAF64B0000C95B4 /* AppFeature.swift in Sources */,
 				C13258A92E8FEDB4008DB386 /* DepressoApp.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
