@@ -45,6 +45,9 @@
 		C18FB07E2EABAE030049ADE8 /* DailyAssessmentFeature.swift in Sources */ = {isa = PBXBuildFile; fileRef = C18FB07D2EABAE020049ADE8 /* DailyAssessmentFeature.swift */; };
 		C18FB0802EABAE1D0049ADE8 /* DailyAssessmentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = C18FB07F2EABAE1C0049ADE8 /* DailyAssessmentView.swift */; };
 		C18FB0822EABCAA60049ADE8 /* UserDefaultsClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = C18FB0812EABCAA60049ADE8 /* UserDefaultsClient.swift */; };
+		C1A7D3D22EBB777A00233740 /* APIClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = C1A7D3D02EBB777A00233740 /* APIClient.swift */; };
+		C1A7D3D42EBB788B00233740 /* BackendAIClient 2.swift in Sources */ = {isa = PBXBuildFile; fileRef = C1A7D3D32EBB788B00233740 /* BackendAIClient 2.swift */; };
+		C1A7D3D62EBB78F600233740 /* UserManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = C1A7D3D52EBB78F600233740 /* UserManager.swift */; };
 		C1BF95552E902121006839CF /* HealthMetric.swift in Sources */ = {isa = PBXBuildFile; fileRef = C1BF95542E90211E006839CF /* HealthMetric.swift */; };
 		C1BF95582E902CB1006839CF /* MotionClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = C1BF95572E902C9A006839CF /* MotionClient.swift */; };
 		C1BF955C2E903213006839CF /* WellnessTask.swift in Sources */ = {isa = PBXBuildFile; fileRef = C1BF955B2E903212006839CF /* WellnessTask.swift */; };
@@ -93,6 +96,9 @@
 		C18FB07D2EABAE020049ADE8 /* DailyAssessmentFeature.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DailyAssessmentFeature.swift; sourceTree = "<group>"; };
 		C18FB07F2EABAE1C0049ADE8 /* DailyAssessmentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DailyAssessmentView.swift; sourceTree = "<group>"; };
 		C18FB0812EABCAA60049ADE8 /* UserDefaultsClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UserDefaultsClient.swift; sourceTree = "<group>"; };
+		C1A7D3D02EBB777A00233740 /* APIClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = APIClient.swift; sourceTree = "<group>"; };
+		C1A7D3D32EBB788B00233740 /* BackendAIClient 2.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "BackendAIClient 2.swift"; sourceTree = "<group>"; };
+		C1A7D3D52EBB78F600233740 /* UserManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UserManager.swift; sourceTree = "<group>"; };
 		C1BF95542E90211E006839CF /* HealthMetric.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HealthMetric.swift; sourceTree = "<group>"; };
 		C1BF95572E902C9A006839CF /* MotionClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MotionClient.swift; sourceTree = "<group>"; };
 		C1BF955B2E903212006839CF /* WellnessTask.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WellnessTask.swift; sourceTree = "<group>"; };
@@ -103,9 +109,22 @@
 		C1DAE5342E908621008F0BE1 /* GoogleService-Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = "GoogleService-Info.plist"; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
+/* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
+		C1A7D3D72EBC9D7500233740 /* Exceptions for "Depresso" folder in "Depresso" target */ = {
+			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
+			membershipExceptions = (
+				Info.plist,
+			);
+			target = C13258A42E8FEDB4008DB386 /* Depresso */;
+		};
+/* End PBXFileSystemSynchronizedBuildFileExceptionSet section */
+
 /* Begin PBXFileSystemSynchronizedRootGroup section */
 		C13258A72E8FEDB4008DB386 /* Depresso */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
+			exceptions = (
+				C1A7D3D72EBC9D7500233740 /* Exceptions for "Depresso" folder in "Depresso" target */,
+			);
 			path = Depresso;
 			sourceTree = "<group>";
 		};
@@ -162,6 +181,7 @@
 		C13258B62E8FEF6E008DB386 /* Core */ = {
 			isa = PBXGroup;
 			children = (
+				C1A7D3D12EBB777A00233740 /* Network */,
 				C1BF95562E902C8C006839CF /* Motion */,
 				C13258EE2E901C71008DB386 /* Health */,
 				C13258DD2E9011BE008DB386 /* AI */,
@@ -204,6 +224,7 @@
 		C13258BF2E8FF349008DB386 /* Data */ = {
 			isa = PBXGroup;
 			children = (
+				C1A7D3D52EBB78F600233740 /* UserManager.swift */,
 				C18FB0812EABCAA60049ADE8 /* UserDefaultsClient.swift */,
 				C18FB07B2EABADD80049ADE8 /* DailyAssessment.swift */,
 				C18D375B2EA426E0008C5B0F /* CommunityPost.swift */,
@@ -266,6 +287,7 @@
 		C13258DD2E9011BE008DB386 /* AI */ = {
 			isa = PBXGroup;
 			children = (
+				C1A7D3D32EBB788B00233740 /* BackendAIClient 2.swift */,
 				C14282162E99EF5100371EB4 /* HuaweiCredentials.swift */,
 				C13258DE2E9011CA008DB386 /* AIClient.swift */,
 			);
@@ -289,6 +311,14 @@
 				C142820D2E99E5E200371EB4 /* PHQ8.swift */,
 			);
 			path = OnBoarding;
+			sourceTree = "<group>";
+		};
+		C1A7D3D12EBB777A00233740 /* Network */ = {
+			isa = PBXGroup;
+			children = (
+				C1A7D3D02EBB777A00233740 /* APIClient.swift */,
+			);
+			path = Network;
 			sourceTree = "<group>";
 		};
 		C1BF95562E902C8C006839CF /* Motion */ = {
@@ -421,6 +451,7 @@
 				C13258F42E901D22008DB386 /* DashboardFeature.swift in Sources */,
 				C18D37622EA42A99008C5B0F /* AddPostView.swift in Sources */,
 				C13258D52E8FFBF3008DB386 /* MessageBubble.swift in Sources */,
+				C1A7D3D62EBB78F600233740 /* UserManager.swift in Sources */,
 				C18D375C2EA426E6008C5B0F /* CommunityPost.swift in Sources */,
 				C18FB07A2EABA5930049ADE8 /* SupportFeature.swift in Sources */,
 				C13258CD2E8FF9F2008DB386 /* JournalView.swift in Sources */,
@@ -429,9 +460,11 @@
 				C13258D22E8FFB39008DB386 /* DS+Spacing.swift in Sources */,
 				C1BF95602E9032D4006839CF /* WellnessTasksFeature.swift in Sources */,
 				C18FB07C2EABADD90049ADE8 /* DailyAssessment.swift in Sources */,
+				C1A7D3D42EBB788B00233740 /* BackendAIClient 2.swift in Sources */,
 				C142820E2E99E5E600371EB4 /* PHQ8.swift in Sources */,
 				C1D2FDDC2EAF64B0000C95B4 /* AppFeature.swift in Sources */,
 				C13258A92E8FEDB4008DB386 /* DepressoApp.swift in Sources */,
+				C1A7D3D22EBB777A00233740 /* APIClient.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

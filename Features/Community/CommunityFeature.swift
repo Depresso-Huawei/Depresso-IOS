@@ -39,24 +39,63 @@ struct CommunityFeature {
         Reduce { state, action in
             switch action {
             case .task:
-                state.isLoading = true
-                state.errorMessage = nil
-                return .merge(
-                    .run { send in
-                        // Fetch initial posts
-                        let descriptor = FetchDescriptor<CommunityPost>(sortBy: [SortDescriptor(\.creationDate, order: .reverse)])
-                        do {
-                            // Access context directly because reducer is MainActor isolated
-                            let posts = try modelContext.context.fetch(descriptor)
-                            await send(.postsLoaded(.success(posts)))
-                        } catch {
-                            await send(.postsLoaded(.failure(error)))
-                        }
-                    },
-                    .run { send in
-                        await send(.likedIDsLoaded(await userDefaultsClient.loadLikedPostIDs()))
+    state.isLoading = true
+    state.errorMessage = nil
+    return .merge(
+        // CHANGED: Fetch posts from backend instead of local SwiftData
+        .run { send in
+            do {
+                // Fetch from backend
+                let postsDTO = try await APIClient.getAllPosts()
+                
+                // Convert DTOs to local models
+                let posts = postsDTO.map { dto -> CommunityPost in
+                    // Check if post already exists locally
+                    let predicate = #Predicate<CommunityPost> { $0.id.uuidString == dto.id }
+                    let descriptor = FetchDescriptor(predicate: predicate)
+                    
+                    if let existingPost = try? modelContext.context.fetch(descriptor).first {
+                        // Update existing post
+                        existingPost.title = dto.title ?? ""
+                        existingPost.content = dto.content
+                        existingPost.likeCount = dto.likeCount
+                        return existingPost
+                    } else {
+                        // Create new post
+                        let newPost = CommunityPost(
+                            id: UUID(uuidString: dto.id) ?? UUID(),
+                            title: dto.title ?? "",
+                            content: dto.content,
+                            creationDate: dto.createdAt,
+                            imageData: nil, // Backend doesn't support images yet
+                            likeCount: dto.likeCount
+                        )
+                        modelContext.context.insert(newPost)
+                        return newPost
                     }
+                }
+                
+                try modelContext.context.save()
+                await send(.postsLoaded(.success(posts)))
+                
+            } catch {
+                print("❌ Error fetching posts from backend: \(error)")
+                // Fallback to local posts
+                let descriptor = FetchDescriptor<CommunityPost>(
+                    sortBy: [SortDescriptor(\.creationDate, order: .reverse)]
                 )
+                if let localPosts = try? modelContext.context.fetch(descriptor) {
+                    await send(.postsLoaded(.success(localPosts)))
+                } else {
+                    await send(.postsLoaded(.failure(error)))
+                }
+            }
+        },
+        // Load liked post IDs (unchanged)
+        .run { send in
+            await send(.likedIDsLoaded(await userDefaultsClient.loadLikedPostIDs()))
+        }
+    )
 
             case .postsLoaded(.success(let posts)):
                 state.posts = posts
@@ -79,19 +118,33 @@ struct CommunityFeature {
 
             // Received 'savePost' delegate action from AddPostFeature
             case .destination(.presented(.addPost(.delegate(.savePost(let newPost))))):
-                // Save explicitly (safe because reducer is MainActor isolated)
-                return .run { send in
-                    // Access context directly
-                    modelContext.context.insert(newPost)
-                    do {
-                        try modelContext.context.save()
-                        print("✅ Community post saved.")
-                        await send(.postSavedSuccessfully(newPost))
-                    } catch {
-                        print("❌ Failed to save community post: \(error)")
-                        await send(.saveFailed(error))
-                    }
-                }
+    // CHANGED: Save to backend first, then local
+    return .run { send in
+        do {
+            let userId = try await UserManager.shared.getCurrentUserId()
+            
+            // Save to backend
+            let postDTO = try await APIClient.createPost(
+                userId: userId,
+                title: newPost.title,
+                content: newPost.content
+            )
+            
+            // Update local post with backend ID
+            newPost.id = UUID(uuidString: postDTO.id) ?? newPost.id
+            
+            // Save locally
+            modelContext.context.insert(newPost)
+            try modelContext.context.save()
+            
+            print("✅ Post saved to backend and locally")
+            await send(.postSavedSuccessfully(newPost))
+            
+        } catch {
+            print("❌ Failed to save post to backend: \(error)")
+            await send(.saveFailed(error))
+        }
+    }
 
             case .postSavedSuccessfully(let newPost):
                 state.posts.insert(newPost, at: 0)
@@ -105,26 +158,49 @@ struct CommunityFeature {
                 return .none
 
             case .likeButtonTapped(let id):
-                guard let index = state.posts.firstIndex(where: { $0.id == id }) else {
-                    return .none
-                }
+    guard let index = state.posts.firstIndex(where: { $0.id == id }) else {
+        return .none
+    }
 
-                let post = state.posts[index]
-                if state.likedPostIDs.contains(id) {
-                    state.likedPostIDs.remove(id)
-                    post.likeCount -= 1
-                } else {
-                    state.likedPostIDs.insert(id)
-                    post.likeCount += 1
-                }
+    let post = state.posts[index]
+    let wasLiked = state.likedPostIDs.contains(id)
+    
+    // Optimistic update
+    if wasLiked {
+        state.likedPostIDs.remove(id)
+        post.likeCount -= 1
+    } else {
+        state.likedPostIDs.insert(id)
+        post.likeCount += 1
+    }
 
-                // Save the ModelContext
-                try? modelContext.context.save()
+    // Save context
+    try? modelContext.context.save()
 
-                let likedIDs = state.likedPostIDs
-                return .run { _ in
-                    await userDefaultsClient.saveLikedPostIDs(likedIDs)
-                }
+    let likedIDs = state.likedPostIDs
+    
+    // CHANGED: Sync with backend
+    return .run { _ in
+        do {
+            let userId = try await UserManager.shared.getCurrentUserId()
+            let postIdString = id.uuidString
+            
+            if wasLiked {
+                try await APIClient.unlikePost(postId: postIdString, userId: userId)
+                print("✅ Post unliked on backend")
+            } else {
+                try await APIClient.likePost(postId: postIdString, userId: userId)
+                print("✅ Post liked on backend")
+            }
+            
+            // Save liked IDs locally
+            await userDefaultsClient.saveLikedPostIDs(likedIDs)
+            
+        } catch {
+            print("❌ Failed to sync like with backend: \(error)")
+            // You might want to rollback the optimistic update here
+        }
+    }
 
             case .destination(.dismiss):
                  state.destination = nil

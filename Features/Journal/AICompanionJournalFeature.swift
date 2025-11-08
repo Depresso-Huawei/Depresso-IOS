@@ -48,6 +48,7 @@ struct AICompanionJournalFeature {
       }
 
       @Dependency(\.aiClient) var aiClient
+      @Dependency(\.backendAIClient) var backendAIClient // ADD this line
       @Dependency(\.motionClient) var motionClient
       @Dependency(\.healthClient) var healthClient
       @Dependency(\.dataSubmissionClient) var dataSubmissionClient
@@ -67,19 +68,22 @@ struct AICompanionJournalFeature {
         Reduce { state, action in
             switch action {
              case .task:
-                 state.journalSessionStartDate = Date()
-                 return .merge(
-                     .run { send in
-                         let descriptor = FetchDescriptor<ChatMessage>(sortBy: [SortDescriptor(\.timestamp)])
-                         await send(.messagesLoaded(Result { try modelContext.context.fetch(descriptor) }))
-                     },
-                     .run { send in
-                         for await motionData in self.motionClient.start() {
-                             await send(.motionUpdate(motionData))
-                         }
-                     }
-                     .cancellable(id: CancelID.motion)
-                 )
+                if state.messages.isEmpty {
+                    state.journalSessionStartDate = Date()
+                    return .merge(
+                        .run { send in
+                            let descriptor = FetchDescriptor<ChatMessage>(sortBy: [SortDescriptor(\.timestamp)])
+                            await send(.messagesLoaded(Result { try modelContext.context.fetch(descriptor) }))
+                        },
+                        .run { send in
+                            for await motionData in self.motionClient.start() {
+                                await send(.motionUpdate(motionData))
+                            }
+                        }
+                        .cancellable(id: CancelID.motion)
+                    )
+                }
+                return .none
              case .messagesLoaded(.success(let messages)):
                  state.messages = messages
                  if messages.isEmpty {
@@ -100,70 +104,72 @@ struct AICompanionJournalFeature {
                  return .none
 
             case .sendButtonTapped:
-                  guard !state.textInput.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return .none }
+    guard !state.textInput.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return .none }
 
-                  let userMessage = ChatMessage(content: state.textInput, isFromCurrentUser: true)
-                  let prompt = state.textInput
+    let userMessage = ChatMessage(content: state.textInput, isFromCurrentUser: true)
+    let prompt = state.textInput
 
-                  state.currentMotionData = state.motionSamples
-                  state.currentEditCountForSubmission = state.editCount
-                  state.currentSessionDuration = Date().timeIntervalSince(state.journalSessionStartDate ?? Date())
-                  let wordCount = userMessage.content.split(whereSeparator: \.isWhitespace).count
-                  state.currentWPM = state.currentSessionDuration > 0 ? (Double(wordCount) / state.currentSessionDuration) * 60.0 : 0
+    state.currentMotionData = state.motionSamples
+    state.currentEditCountForSubmission = state.editCount
+    state.currentSessionDuration = Date().timeIntervalSince(state.journalSessionStartDate ?? Date())
+    let wordCount = userMessage.content.split(whereSeparator: \.isWhitespace).count
+    state.currentWPM = state.currentSessionDuration > 0 ? (Double(wordCount) / state.currentSessionDuration) * 60.0 : 0
 
-                  state.textInput = ""
-                  state.isSendingMessage = true
-                  state.journalSessionStartDate = Date()
-                  state.editCount = 0
-                  state.motionSamples = []
+    state.textInput = ""
+    state.isSendingMessage = true
+    state.journalSessionStartDate = Date()
+    state.editCount = 0
+    state.motionSamples = []
 
-                  let historyToSubmit = history(from: state.messages)
+    // EXPLANATION OF CHANGES:
+    // OLD: We called aiClient.generateResponse directly
+    // NEW: We use backendAIClient which routes through your backend
+    
+    return .run { send in
+        // Save user message locally first
+        modelContext.context.insert(userMessage)
+        do {
+            try modelContext.context.save()
+            await send(.userMessageSaved(.success(userMessage)))
+        } catch {
+            await send(.userMessageSaved(.failure(error)))
+            return
+        }
 
-                return .run { send in
-                    // Save user message
-                    modelContext.context.insert(userMessage)
-                    do {
-                        try modelContext.context.save()
-                        await send(.userMessageSaved(.success(userMessage)))
-                    } catch {
-                        await send(.userMessageSaved(.failure(error)))
-                        return
-                    }
+        // Start concurrent operations
+        async let aiResponseTask = Task {
+            // CHANGED: Use backendAIClient instead of aiClient
+            // The backend will handle the AI call and return the response
+            let responseText = try await backendAIClient.generateResponse([], prompt, nil)
+            return ChatMessage(content: responseText, isFromCurrentUser: false)
+        }
 
-                    // --- Start concurrent fetches ---
-                    async let aiResponseTask = Task {
-                         let systemPrompt = "You are a friendly journaling companion..."
-                         let responseText = try await aiClient.generateResponse(historyToSubmit, prompt, systemPrompt)
-                         return ChatMessage(content: responseText, isFromCurrentUser: false)
-                     }
+        async let healthMetricsTask = Task { () -> DailyMetrics in
+            let metricsArray = try await healthClient.fetchHealthMetrics()
+            let steps = metricsArray.first(where: { $0.type == .steps })?.value ?? 0.0
+            let energy = metricsArray.first(where: { $0.type == .calories })?.value ?? 0.0
+            let heartRate = metricsArray.first(where: { $0.type == .heartRate })?.value ?? 0.0
+            return DailyMetrics(steps: steps, activeEnergy: energy, heartRate: heartRate)
+        }
 
-                    async let healthMetricsTask = Task { () -> DailyMetrics in
-                        // ✅ FIX: Add 'try await' here
-                         let metricsArray = try await healthClient.fetchHealthMetrics()
-                         let steps = metricsArray.first(where: { $0.type == .steps })?.value ?? 0.0
-                         let energy = metricsArray.first(where: { $0.type == .calories })?.value ?? 0.0 // Use correct enum case
-                         let heartRate = metricsArray.first(where: { $0.type == .heartRate })?.value ?? 0.0
-                         return DailyMetrics(steps: steps, activeEnergy: energy, heartRate: heartRate)
-                    }
+        // Await results
+        do {
+            let aiMessage = try await aiResponseTask.value
+            let dailyMetrics = try await healthMetricsTask.value
 
-                    // Await results and save AI message
-                    do {
-                        let aiMessage = try await aiResponseTask.value
-                        let dailyMetrics = try await healthMetricsTask.value
+            // Save AI message locally
+            modelContext.context.insert(aiMessage)
+            try modelContext.context.save()
+            await send(.aiMessageSaved(.success(aiMessage)))
 
-                        // Save AI message
-                        modelContext.context.insert(aiMessage)
-                        try modelContext.context.save()
-                        await send(.aiMessageSaved(.success(aiMessage)))
+            await send(.submissionDataLoaded(.success(dailyMetrics)))
 
-                        await send(.submissionDataLoaded(.success(dailyMetrics)))
-
-                    } catch {
-                        print("❌ Error during concurrent fetch/save: \(error)")
-                        await send(.aiMessageSaved(.failure(error)))
-                        await send(.submissionDataLoaded(.failure(error)))
-                    }
-                }
+        } catch {
+            print("❌ Error during concurrent fetch/save: \(error)")
+            await send(.aiMessageSaved(.failure(error)))
+            await send(.submissionDataLoaded(.failure(error)))
+        }
+    }
 
              case .userMessageSaved(.success(let message)):
                  withAnimation {
@@ -193,20 +199,37 @@ struct AICompanionJournalFeature {
                   state.isSendingMessage = false
                   return .none
              case .submissionDataLoaded(.success(let dailyMetrics)):
-                 let avgMotion = state.currentMotionData.reduce((0.0, 0.0, 0.0)) { ($0.0 + $1.x, $0.1 + $1.y, $0.2 + $1.z) }
-                 let count = Double(state.currentMotionData.count)
-                 let motionMetrics = DeviceMotionMetrics(
-                    avgAccelerationX: count > 0 ? avgMotion.0 / count : 0,
-                    avgAccelerationY: count > 0 ? avgMotion.1 / count : 0,
-                    avgAccelerationZ: count > 0 ? avgMotion.2 / count : 0
-                 )
-                 let typingMetrics = TypingMetrics(
-                    wordsPerMinute: state.currentWPM,
-                    totalEditCount: state.currentEditCountForSubmission
-                 )
-                 return .run { [typing = typingMetrics, motion = motionMetrics] _ in
-                    try await self.dataSubmissionClient.submitMetrics(self.uuid().uuidString, dailyMetrics, typing, motion)
-                 } catch: { error, _ in print("Error submitting analytics data: \(error)") }
+    // Calculate motion metrics
+    let avgMotion = state.currentMotionData.reduce((0.0, 0.0, 0.0)) { 
+        ($0.0 + $1.x, $0.1 + $1.y, $0.2 + $1.z) 
+    }
+    let count = Double(state.currentMotionData.count)
+    let motionMetrics = DeviceMotionMetrics(
+        avgAccelerationX: count > 0 ? avgMotion.0 / count : 0,
+        avgAccelerationY: count > 0 ? avgMotion.1 / count : 0,
+        avgAccelerationZ: count > 0 ? avgMotion.2 / count : 0
+    )
+    
+    let typingMetrics = TypingMetrics(
+        wordsPerMinute: state.currentWPM,
+        totalEditCount: state.currentEditCountForSubmission
+    )
+    
+    // NEW: Get user ID and submit to backend
+    return .run { _ in
+        do {
+            let userId = try await UserManager.shared.getCurrentUserId()
+            try await self.dataSubmissionClient.submitMetrics(
+                userId,
+                dailyMetrics,
+                typingMetrics,
+                motionMetrics
+            )
+            print("✅ Successfully submitted metrics to backend")
+        } catch {
+            print("❌ Error submitting analytics data: \(error)")
+        }
+    }
              case .submissionDataLoaded(.failure(let error)):
                  print("Failed to load HealthKit data for submission: \(error)")
                  return .none

@@ -58,25 +58,28 @@ struct DashboardFeature {
         Reduce { state, action in
             switch action {
              case .task:
-                  state.isLoading = true
-                  return .merge(
-                      .run { send in
-                          // Request auth first if needed
-                          try? await healthClient.requestAuthorization()
-                          // Then fetch data
-                          await send(.healthDataLoaded(Result {
-                              try await (healthClient.fetchHealthMetrics(), healthClient.fetchWeeklySteps(), healthClient.fetchWeeklyActiveEnergy(), healthClient.fetchWeeklyHeartRate())
-                          }))
-                      },
-                      .run { send in
-                           let sevenDaysAgo = Calendar.current.date(byAdding: .day, value: -7, to: now)!
-                           let predicate = #Predicate<DailyAssessment> { $0.date >= sevenDaysAgo }
-                           let descriptor = FetchDescriptor<DailyAssessment>(predicate: predicate, sortBy: [SortDescriptor(\.date)])
-                           // Use .context to access the actual ModelContext
-                           await send(.assessmentHistoryLoaded(Result { try modelContext.context.fetch(descriptor) }))
-                       },
-                       .send(.checkForAssessmentStatus)
-                  )
+                if state.healthMetrics.isEmpty {
+                    state.isLoading = true
+                    return .merge(
+                        .run { send in
+                            // Request auth first if needed
+                            try? await healthClient.requestAuthorization()
+                            // Then fetch data
+                            await send(.healthDataLoaded(Result {
+                                try await (healthClient.fetchHealthMetrics(), healthClient.fetchWeeklySteps(), healthClient.fetchWeeklyActiveEnergy(), healthClient.fetchWeeklyHeartRate())
+                            }))
+                        },
+                        .run { send in
+                            let sevenDaysAgo = Calendar.current.date(byAdding: .day, value: -7, to: now)!
+                            let predicate = #Predicate<DailyAssessment> { $0.date >= sevenDaysAgo }
+                            let descriptor = FetchDescriptor<DailyAssessment>(predicate: predicate, sortBy: [SortDescriptor(\.date)])
+                            // Use .context to access the actual ModelContext
+                            await send(.assessmentHistoryLoaded(Result { try modelContext.context.fetch(descriptor) }))
+                        },
+                        .send(.checkForAssessmentStatus)
+                    )
+                }
+                return .none
 
              case .healthDataLoaded(.success(let (metrics, steps, energy, heartRate))):
                  state.healthMetrics = metrics
